@@ -15,10 +15,10 @@ $aws configure
 2 - Provide the following inputs when prompted:
 - AWS Access Key ID: Paste your access key.
 - AWS Secret Access Key: Paste your secret key.
-- Default region name: Enter your target region (e.g., us-west-2 as this project will provision all the infrastructure in this region).
+- Default region name: Enter your target region (e.g., us-east-2, as this project will provision all the infrastructure in this region).
 - Default output format: Type json (or leave blank)
 
-NB: For more information, check the AWS documentation: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-quickstart.html
+For more information, check the AWS documentation: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-quickstart.html
 
 ## Provision SSH Key Pair
 
@@ -50,7 +50,7 @@ $terraform plan
 $terraform apply --auto-approve
 ```
 
-NB: The --auto-approve argument is used to approve the configuration without interaction automatically
+NB: The --auto-approve argument is used to approve the configuration automatically without interaction
 
 ## Provision the infrastructure using Terraform
 
@@ -62,6 +62,8 @@ This Terraform project does the following:
 * Create a security group that permits HTTP and SSH traffic and all outbound traffic for the Nginx Load Balancer
 * Query the AWS AMI Catalog using Data Source
 * Create EC2 instances using the queried AMI and the generated key pair
+  * A # of instances will be created as web servers
+  * A single EC2 instance to act as an Nginx load balancer, which receives requests on port 80 and forwards the traffic to the pool of servers that listen on port 8080
 
 To provision the infrastructure, run the following commands:
 
