@@ -64,6 +64,7 @@ This Terraform project does the following:
 * Create EC2 instances using the queried AMI and the generated key pair
 
 To provision the infrastructure, run the following commands:
+
 1 - Change to the terraform directory that contains the configuration files
 ```bash
 $cd terraform/
