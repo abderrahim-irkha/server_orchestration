@@ -32,7 +32,7 @@ This module does the following:
 
 1 - Access the key_pair configuration module
 ```bash
-$cd modules/key_pair
+$cd terraform/modules/key_pair
 ```
 
 2 - To initialize the project and download the corresponding provider plugins from the Terraform Registry, run
@@ -58,8 +58,8 @@ This Terraform project does the following:
 
 * Retrieve the default VPC and its ID
 * Retrieve the key pair that was generated in the key_pair module
-* Create a security group that permits HTTP and SSH traffic and all outbound traffic for webservers
-* Create a security group that permits HTTP and SSH traffic and all outbound traffic for the Nginx Load Balancer
+* Create a security group that permits HTTP (port 8080) and SSH (port 22) traffic and all outbound traffic for webservers
+* Create a security group that permits HTTP (port 80) and SSH (port 22) traffic and all outbound traffic for the Nginx Load Balancer
 * Query the AWS AMI Catalog using Data Source
 * Create EC2 instances using the queried AMI and the generated key pair
   * A # of instances will be created as web servers
