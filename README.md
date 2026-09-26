@@ -1,6 +1,6 @@
 # Deploy a sample Node.js application using Server Orchestration on AWS with Terraform and Ansible as IaC tools.
 
-This repo contains configuration files leveraging Terraform as a provisioning tool to create a pool of AWS EC2 instances and configure the infrastructure using Ansible as a Configuration Management tool
+This repository provides a production-ready Infrastructure as Code (IaC) framework for deploying a sample Node.js application on AWS using an automated Server Orchestration approach. By leveraging the combined power of Terraform for provisioning AWS infrastructure and Ansible for configuration management, the deployment pipeline fully supports zero-downtime rolling updates to ensure continuous service availability.
 
 ## Authenticate to AWS
 
