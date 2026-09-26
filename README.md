@@ -92,3 +92,36 @@ instance_count = 3
 $terraform apply --auto-approve
 ```
 5 - Make sure to copy the public IP address of your EC2 instance that will run your load balancer, as it will be displayed as an output variable
+
+## Configure the pool of servers to run the Node.js sample app using Ansible
+
+The file ansible/configure_sample-app_playbook.yml is responsible for configuring the webservers.
+
+```yml
+---
+- name: Configure the servers to run the sample-app
+  hosts: sample_app    #1
+  gather_facts: true
+  become: true
+
+  roles:
+    - role: nodejs-app    #2
+    - role: sample-app    #3
+      become_user: app-user    #4
+```
+
+This Ansible Playbook does the following:
+
+1. Target "sample_app" instances
+2. The code in this configuration file uses two roles. The first role, called "nodejs-app", is responsible for configuring a server to run Node.js apps
+3. The second role is called sample-app, and it’s responsible for running the sample app
+4. The "sample-app" role will be executed as the OS user "app-user", which is a user that the "nodejs-app" role creates, rather
+than as the root user
+
+The nodejs-app role tasks, conf file: ansible/roles/nodejs-app/tasks/main.yml
+The nodejs-app role is fairly generic, usable with almost any Node.js app:
+
+* Install Node.js on the webservers EC2 instances.
+* Create a new OS user called app-user. This allows you to run your apps with a user with more limited permissions than root.
+* Install PM2 and configure it to run on boot. You’ll see what PM2 is
+shortly.
