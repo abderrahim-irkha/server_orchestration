@@ -257,7 +257,7 @@ Copy the IP of one of the three servers, open http://<IP>:8080 in your web brows
 
 While three servers are great for redundancy, it’s not so great for usability, as your users typically want just a single endpoint to hit. This requires deploying a load balancer
 
-## Configure the Load Balancer we deployed earlier by using Ansible and Nginx
+## Configure the Load Balancer we deployed earlier using Ansible and Nginx
 
 ### Defining the Nginx Load Balancer group vars
 
@@ -322,3 +322,48 @@ xxx.us-east-2.compute.amazonaws.com : ok=4    changed=3    unreachable=0    fail
 ```
 
 The value on the left, xxx.us-east-2.compute.amazonaws.com, is a domain name you can use to access the nginx server. If you open http://xxx.us-east-2.compute.amazonaws.com in your browser (this time with no port number, as nginx is listening on port 80, the default port for HTTP), you should see “Hello, World!” yet again. Each time you refresh the page, Nginx will send that request to a different EC2 instance (known as round-robin load balancing). Congrats, you now have a single endpoint you can give your users, and that endpoint will automatically balance the load across multiple servers!
+
+## Roll Out Updates with Ansible
+
+So you’ve now seen how to deploy using a server orchestration tool, but what about doing an update? The same configuration file from the playbook ansible/configure_sample-app_playbook.yml can be adjusted to do a rolling deployment
+
+### Rolling deployment:
+
+```yml
+---
+- name: Configure the servers to run the sample-app
+
+  # ... (Other params omitted for clarity) ...
+
+  serial: 1                #1
+  max_fail_percentage: 30  #2
+```
+
+1. Setting "serial" to "1" tells Ansible to apply changes to one server at a time. Since we have three servers total, this ensures that two servers are always available to serve the traffic while one goes down briefly for an update.
+2. The "max_fail_percentage" parameter tells Ansible to abort a deployment if more than this percentage of servers hit an error during the upgrade. Setting this to 30% with three servers means that Ansible will abort the deployment if even a single server hits an error, so we never lose more than one server to a broken update
+
+NB: This configuration is already included in this repo; to activate this feature, you can just uncomment these parameters within the file
+
+Let’s give the rolling deployment a shot. Update the text that the app responds with in app.js
+
+### Update the app response text (ansible/roles/sample-app/files/app.js)
+
+```javascript
+res.end('Fundamentals of DevOps!\n');
+```
+
+And rerun the playbook:
+
+```bash
+$ansible-playbook -v -i inventory.aws_ec2.yml configure_sample-app_playbook.yml
+```
+
+Ansible will roll out the change to one server at a time. When it’s done, if you refresh the Nginx IP in your browser, you should see the text “Fundamentals of DevOps!”
+
+Or you can see the change live from another terminal by running this command:
+
+```bash
+$while true; do curl http://<YourLoadBalancer-IP>; done
+```
+
+So, during the deployment, the Nginx Load Balancer will keep forwarding the traffic to each web server at a time, following the approach of Round Robin. So, the output will toggle between "Hello, World!" and "Fundamentals of DevOps!" until the upgrade is finished for all the servers
