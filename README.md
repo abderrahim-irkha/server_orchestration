@@ -5,7 +5,7 @@ This repo contains configuration files leveraging Terraform as a provisioning to
 ## Authenticate to AWS
 
 Prerequisites:
-An Access Key ID and a Secret Access Key generated from the AWS IAM Console under Users -> [Your Username] -> Security credentials -> Create access key
+An Access Key ID and a Secret Access Key are generated from the AWS IAM Console under Users -> [Your Username] -> Security credentials -> Create access key
 
 1 - Open your terminal and run:
 ```bash
@@ -139,6 +139,7 @@ The sample-app role contains two folders, files, and tasks:
     └── tasks
         └── main.yml
 ```
+### Node.js sample app
 
 app.js is the sample Node.js app that prints "Hello, World!" as output
 
@@ -156,7 +157,7 @@ server.listen(port,() => {
 });
 ```
 
-app.config.js is a file that contains PM2 configuration, which is a process supervisor, which is a tool you can use to run your apps, monitor them, restart them after a reboot or a crash, and manage their logging. Process supervisors provide one layer of auto-healing for long-running apps.
+app.config.js is a file that contains PM2 configuration. PM2 is a process supervisor, which is a tool you can use to run your apps, monitor them, restart them after a reboot or a crash, and manage their logging. Process supervisors provide one layer of auto-healing for long-running apps.
 
 Many process supervisors exist, including PM2 Supervisor and Systemd, with Systemd being the one you’re likely to use, as it’s built into most Linux distributions these days. PM2 was picked for this project because it has features designed specifically for Node.js apps.
 
@@ -203,7 +204,7 @@ Finally, we configure the "sample-app" role task to run the sample app. Config f
 2. Use PM2 to start the app in the background and start monitoring it.
 3. Save the list of apps PM2 is running so that if the server reboots, PM2 will automatically restart those apps.
 
-#### Dynamic Ansible Inventory:
+### Dynamic Ansible Inventory:
 
 Since we run servers in the cloud, where servers come and go often and IP addresses change frequently, we’re better off using an inventory plugin that can dynamically discover our servers. For example, we can use the aws_ec2 inventory plugin to discover the EC2 instances we deploy with Terraform. Config file: ansible/inventory.aws_ec2.yml
 
@@ -220,6 +221,21 @@ This config file does the following:
 1. During the provisioning of our infrastructure using Terraform, we assigned an "Ansible" tag. In the preceding section, we set this tag to sample_app when we passed the var.base_name. So, that will be the name of the group.
 2. By default, Ansible adds a leading underscore to group names. This disables it so the group name matches the tag name.
 
+### Group variables:
+
+For each group in your inventory, you can specify group variables to configure how to connect to the servers in that group. You define these variables in YAML files in the group_vars folder, with the name of the file set to the name of the group. For example, for the EC2 instance in the sample_app group, we created a file in group_vars/sample_app.yml
+
+```yml
+ansible_user: ec2-user                           #1
+ansible_ssh_private_key_file: ../sample-app.key  #2
+ansible_host_key_checking: false                 #3
+```
+#### The preceding code does the following:
+
+1. Use ec2-user as the username to connect to the EC2 instance. This is the username you need to use with Amazon Linux AMIs.
+2. Use the SSH private key sample-app.key to authenticate to the EC2 instances. This is the key we provisioned earlier using Terraform
+3. Skip host key checking so you don’t get interactive prompts from Ansible.
+
 #### To try this Ansible Playbook, run the following command:
 
 ```bash
@@ -228,8 +244,81 @@ $ansible-playbook -v -i inventory.aws_ec2.yml configure_sample-app_playbook.yml
 
 Ansible will discover our servers and, on each one, install Node.js and run the sample app. At the end, you should see the IP addresses of the servers
 
+Wait a few minutes for everything to deploy, and in the end, you should see log output that looks like this:
+
+```text
+PLAY RECAP *****************************************************************************************************************************
+xxx.us-east-2.compute.amazonaws.com : ok=9    changed=8    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+xxx.us-east-2.compute.amazonaws.com : ok=9    changed=8    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+xxx.us-east-2.compute.amazonaws.com : ok=9    changed=8    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0  
+```
+
 Copy the IP of one of the three servers, open http://<IP>:8080 in your web browser, and you should see the familiar “Hello, World!” text
 
-While three servers is great for redundancy, it’s not so great for usability, as your users typically want just a single endpoint to hit. This requires deploying a load balancer
+While three servers are great for redundancy, it’s not so great for usability, as your users typically want just a single endpoint to hit. This requires deploying a load balancer
 
 ## Configure the Load Balancer we deployed earlier by using Ansible and Nginx
+
+### Defining the Nginx Load Balancer group vars
+
+We copied the same configuration to the group_vars file named nginx_lb, which is defined as a tag name during the provisioning phase
+
+### Specify the nginx role as a dependency
+
+Now you can configure these servers to run Nginx by using an Ansible role called nginx that’s available in the GitHub repo https://github.com/abderrahim-irkha/nginx-role
+
+NB: Forked from brikis98/devops-book-nginx-role
+
+To use the nginx role, we created a file called requirements.yml
+
+```yml
+- name: nginx
+  src: https://github.com/abderrahim-irkha/nginx-role
+  version: 1.0.0
+```
+
+Next, run the ansible-galaxy command to install the role:
+
+```bash
+$ansible-galaxy role install -r requirements.yml
+```
+
+### Configure Nginx
+
+Config file: ansible/configure_nginx_playbook.yml
+
+```yml
+- name: Configure servers to run nginx
+  hosts: nginx_lb                                #1
+  gather_facts: true
+  become: true
+  roles:
+    - role: nginx                                #2
+      vars:                                      #3
+        servers: >-
+          {{ groups['sample_app']
+             | map('extract', hostvars, 'private_dns_name')
+             | map('regex_replace', '$', ':8080')
+             | list }}
+```
+
+#### This playbook does the following:
+
+1. Targets the nginx_lb group we configured in our inventory.
+2. Configures the servers in that group, using the nginx role we just installed.
+3. Uses Jinja template syntax to set the servers input variable to the private IP address and port 8080 of each of our sample app servers.
+
+#### To try this Ansible Playbook, run the following command:
+
+```bash
+$ansible-playbook -v -i inventory.aws_ec2.yml configure_nginx_playbook.yml
+```
+
+Wait a few minutes for everything to deploy, and in the end, you should see log output that looks like this:
+
+```text
+PLAY RECAP *****************************************************************************************************************************
+xxx.us-east-2.compute.amazonaws.com : ok=4    changed=3    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0  
+```
+
+The value on the left, xxx.us-east-2.compute.amazonaws.com, is a domain name you can use to access the nginx server. If you open http://xxx.us-east-2.compute.amazonaws.com in your browser (this time with no port number, as nginx is listening on port 80, the default port for HTTP), you should see “Hello, World!” yet again. Each time you refresh the page, Nginx will send that request to a different EC2 instance (known as round-robin load balancing). Congrats, you now have a single endpoint you can give your users, and that endpoint will automatically balance the load across multiple servers!
